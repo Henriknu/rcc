@@ -1,10 +1,12 @@
 use anyhow::Result;
 use clap::{Parser, Subcommand, ValueEnum};
+use gen::CodeGen;
 
 use crate::parser::Parser as CParser;
 use crate::{lexer::Lexer, token::TokenKind};
 
 pub mod ast;
+pub mod gen;
 pub mod lexer;
 pub mod parser;
 pub mod token;
@@ -16,18 +18,34 @@ fn main() -> Result<()> {
     } = Args::parse();
 
     match command {
-        Command::Run {
-            file,
-            output: _output,
-        } => {
-            assemble(&file, &global_opts)?;
+        Command::Run { file, output } => {
+            let asm = assemble(&file, &global_opts)?;
+
+            std::fs::write(&output, asm)?;
+
+            build_executable(&output);
+            run_executable();
+
+            Ok(())
         }
     }
-
-    Ok(())
 }
 
-fn assemble(file: &str, global_opts: &GlobalOpts) -> Result<()> {
+fn run_executable() {
+    println!("\nRunning executable...\n\n");
+
+    let output = std::process::Command::new("./out").output().unwrap();
+    println!("{}", String::from_utf8_lossy(&output.stdout));
+}
+
+fn build_executable(output: &str) {
+    std::process::Command::new("cc")
+        .args(["-o", "out", output])
+        .output()
+        .unwrap();
+}
+
+fn assemble(file: &str, global_opts: &GlobalOpts) -> Result<String> {
     let path = file;
 
     let Ok(content) = std::fs::read_to_string(path) else {
@@ -51,7 +69,13 @@ fn assemble(file: &str, global_opts: &GlobalOpts) -> Result<()> {
         println!("== Ast ==\n\n{:#?}\n", ast);
     }
 
-    Ok(())
+    let out = CodeGen::new().gen(&ast);
+
+    if global_opts.has_emit(Emit::Asm) {
+        println!("== Assembly ==\n\n{}\n", out);
+    }
+
+    Ok(out)
 }
 
 fn emit_tokens(source: &str) {
