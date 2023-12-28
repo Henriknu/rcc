@@ -14,7 +14,8 @@ pub struct FnDecl {
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Stmt {
-    LocalDecl(LocalDecl),
+    VarDecl(VarDecl),
+    AssignmentStmt(AssignmentStmt),
     ExprStmt(ExprStmt),
     PrintStmt(PrintStmt),
 }
@@ -30,9 +31,15 @@ pub struct PrintStmt {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub struct LocalDecl {
+pub struct AssignmentStmt {
     pub name: Token,
-    pub initializer: Option<Expr>,
+    pub expr: Expr,
+}
+
+// Int datatype is implicit
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct VarDecl {
+    pub name: Token,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]

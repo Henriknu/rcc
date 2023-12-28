@@ -50,6 +50,8 @@ pub enum TokenKind {
     Number,
     Ident,
 
+    Int,
+
     Eof,
     #[default]
     Invalid,

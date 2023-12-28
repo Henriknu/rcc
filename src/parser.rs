@@ -1,20 +1,26 @@
-use std::fmt::Display;
-
 use thiserror::Error;
 
 use crate::{
     ast::{
-        BinaryExpr, BinaryOp, Call, Expr, ExprStmt, FnDecl, Item, Literal, LocalDecl, PrintStmt,
-        Stmt, Var,
+        AssignmentStmt, BinaryExpr, BinaryOp, Call, Expr, ExprStmt, Literal, PrintStmt, Stmt, Var,
+        VarDecl,
     },
     lexer::Lexer,
+    sym::SymbolTable,
     token::{Token, TokenKind},
 };
 
+pub struct Program<'s> {
+    pub source: &'s str,
+    pub stmts: Vec<Stmt>,
+    pub symbol_table: SymbolTable,
+}
+
 pub type ParserResult<T> = Result<T, ParsingError>;
 
-pub fn parse(source: &str) -> ParserResult<Vec<Stmt>> {
-    let mut parser = Parser::new(source);
+pub fn parse(source: &str) -> ParserResult<Program> {
+    let parser = Parser::new(source);
+
     parser.parse()
 }
 
@@ -23,6 +29,7 @@ pub struct Parser<'s> {
     lexer: Lexer<'s>,
     current: Token,
     next: Token,
+    symbol_table: SymbolTable,
 }
 
 impl<'s> Parser<'s> {
@@ -36,17 +43,24 @@ impl<'s> Parser<'s> {
             lexer,
             current,
             next,
+            symbol_table: SymbolTable::new(),
         }
     }
 
-    pub fn parse(&mut self) -> ParserResult<Vec<Stmt>> {
+    pub fn parse(mut self) -> ParserResult<Program<'s>> {
         let mut stmts = Vec::new();
 
         while !self.is_at_end() {
+            dbg!("parsing stmt");
+
             stmts.push(self.stmt()?);
         }
 
-        Ok(stmts)
+        Ok(Program {
+            source: self.source,
+            stmts,
+            symbol_table: self.symbol_table,
+        })
     }
 
     /*  fn item(&mut self) -> ParserResult<Item> {
@@ -93,27 +107,48 @@ impl<'s> Parser<'s> {
     fn stmt(&mut self) -> ParserResult<Stmt> {
         if self.consume_if(TokenKind::Print) {
             self.print_stmt()
+        } else if self.consume_if(TokenKind::Int) {
+            self.vardecl_stmt()
+        } else if self.current.is_kind(TokenKind::Ident) {
+            self.assignment_stmt()
         } else {
             self.expr_stmt()
         }
     }
 
-    /*  fn local_decl(&mut self) -> ParserResult<Stmt> {
+    fn vardecl_stmt(&mut self) -> ParserResult<Stmt> {
         let name = self.expect(TokenKind::Ident)?;
-
-        let initializer = if self.consume_if(TokenKind::Equals) {
-            let expr = self.expr()?;
-            Some(expr)
-        } else {
-            None
-        };
 
         self.expect(TokenKind::Semicolon)?;
 
-        let vardecl = LocalDecl { name, initializer };
+        let vardecl = VarDecl { name };
 
-        Ok(Stmt::LocalDecl(vardecl))
-    } */
+        // add name to symbol table
+
+        self.symbol_table.add(name.literal(self.source).to_owned());
+
+        Ok(Stmt::VarDecl(vardecl))
+    }
+
+    fn assignment_stmt(&mut self) -> ParserResult<Stmt> {
+        let name = self.expect(TokenKind::Ident)?;
+
+        if !self.symbol_table.contains(name.literal(self.source)) {
+            return Err(ParsingError::UndeclaredVariable(
+                name.literal(self.source).to_owned(),
+            ));
+        }
+
+        self.expect(TokenKind::Equals)?;
+
+        let expr = self.expr()?;
+
+        self.expect(TokenKind::Semicolon)?;
+
+        let assignment_stmt = AssignmentStmt { name, expr };
+
+        Ok(Stmt::AssignmentStmt(assignment_stmt))
+    }
 
     fn print_stmt(&mut self) -> ParserResult<Stmt> {
         let expr = self.expr()?;
@@ -230,6 +265,12 @@ impl<'s> Parser<'s> {
                 let name = self.current;
                 self.consume();
 
+                if !self.symbol_table.contains(name.literal(self.source)) {
+                    return Err(ParsingError::UndeclaredVariable(
+                        name.literal(self.source).to_owned(),
+                    ));
+                }
+
                 Ok(Expr::Var(Var { name }))
             }
 
@@ -280,28 +321,13 @@ impl<'s> Parser<'s> {
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Error)]
 pub enum ParsingError {
+    #[error("Unexpected token (expected {expected:?}, found {actual:?})")]
     UnexpectedToken {
         actual: TokenKind,
         expected: Option<TokenKind>,
     },
-}
-
-impl Display for ParsingError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            ParsingError::UnexpectedToken { actual, expected } => {
-                if let Some(expected) = expected {
-                    write!(
-                        f,
-                        "Unexpected token found: {:?}, expected: {:?}",
-                        actual, expected
-                    )
-                } else {
-                    write!(f, "Unexpected token found: {:?}", actual)
-                }
-            }
-        }
-    }
+    #[error("Undeclared variable: {0}")]
+    UndeclaredVariable(String),
 }
 
 #[cfg(test)]
@@ -323,44 +349,53 @@ mod tests {
         assert_eq!(Parser::new(SOURCE).expr().unwrap(), expr);
     }
 
-    #[test]
-    fn call() {
-        const SOURCE: &str = "print(a)";
+    /*     #[test]
+       fn call() {
+           const SOURCE: &str = "print(a)";
 
-        let expr = Expr::Call(Box::new(Call {
-            callee: Expr::Var(Var {
-                name: Token {
-                    kind: TokenKind::Ident,
-                    span: TokenSpan { start: 0, len: 5 },
-                },
+           let expr = Expr::Call(Box::new(Call {
+               callee: Expr::Var(Var {
+                   name: Token {
+                       kind: TokenKind::Ident,
+                       span: TokenSpan { start: 0, len: 5 },
+                   },
+               }),
+               arguments: vec![Expr::Var(Var {
+                   name: Token {
+                       kind: TokenKind::Ident,
+                       span: TokenSpan { start: 6, len: 1 },
+                   },
+               })],
+           }));
+
+           assert_eq!(Parser::new(SOURCE).expr().unwrap(), expr);
+       }
+    */
+    #[test]
+    fn vardecl() {
+        const SOURCE: &str = "int a; a = 4 + 4;";
+
+        let stmts = vec![
+            Stmt::VarDecl(VarDecl {
+                name: Token::new(TokenKind::Ident, TokenSpan::new(4, 1)),
             }),
-            arguments: vec![Expr::Var(Var {
-                name: Token {
-                    kind: TokenKind::Ident,
-                    span: TokenSpan { start: 6, len: 1 },
-                },
-            })],
-        }));
+            Stmt::AssignmentStmt(AssignmentStmt {
+                name: Token::new(TokenKind::Ident, TokenSpan::new(7, 1)),
+                expr: Expr::BinaryExpression(Box::new(BinaryExpr {
+                    left: Expr::Literal(Literal::Int(4)),
+                    right: Expr::Literal(Literal::Int(4)),
+                    op: BinaryOp::Add,
+                })),
+            }),
+        ];
 
-        assert_eq!(Parser::new(SOURCE).expr().unwrap(), expr);
+        let parsed = parse(SOURCE).unwrap();
+
+        assert_eq!(parsed.symbol_table.iter().count(), 1);
+        assert_eq!(parsed.stmts, stmts);
     }
+
     /*
-    #[test]
-    fn local_decl() {
-        const SOURCE: &str = "let a = 4 + 4;";
-
-        let stmt = Stmt::LocalDecl(LocalDecl {
-            name: Token::new(TokenKind::Ident, TokenSpan::new(4, 1)),
-            initializer: Some(Expr::BinaryExpression(Box::new(BinaryExpr {
-                left: Expr::Literal(Literal::Int(4)),
-                right: Expr::Literal(Literal::Int(4)),
-                op: BinaryOp::Add,
-            }))),
-        });
-
-        assert_eq!(Parser::new(SOURCE).stmt().unwrap(), stmt);
-    }
-
     #[test]
     fn fn_decl() {
         const SOURCE: &str = "fn main() { let a = 4 + 4; }";

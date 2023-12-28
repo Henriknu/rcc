@@ -66,6 +66,7 @@ impl<'s> Lexer<'s> {
     fn keyword(&mut self) -> Option<Token> {
         let token_type = match &self.source[self.start..self.current] {
             "print" => TokenKind::Print,
+            "int" => TokenKind::Int,
             _ => return None,
         };
 

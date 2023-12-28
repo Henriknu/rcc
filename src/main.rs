@@ -1,6 +1,7 @@
 use anyhow::Result;
 use clap::{Parser, Subcommand, ValueEnum};
 use gen::CodeGen;
+use parser::parse;
 
 use crate::parser::Parser as CParser;
 use crate::{lexer::Lexer, token::TokenKind};
@@ -9,6 +10,7 @@ pub mod ast;
 pub mod gen;
 pub mod lexer;
 pub mod parser;
+pub mod sym;
 pub mod token;
 
 fn main() -> Result<()> {
@@ -61,15 +63,13 @@ fn assemble(file: &str, global_opts: &GlobalOpts) -> Result<String> {
         emit_tokens(&content);
     }
 
-    let mut parser = CParser::new(&content);
-
-    let ast = parser.parse()?;
+    let program = parse(&content)?;
 
     if global_opts.has_emit(Emit::Ast) {
-        println!("== Ast ==\n\n{:#?}\n", ast);
+        println!("== Ast ==\n\n{:#?}\n", &program.stmts);
     }
 
-    let out = CodeGen::new().gen(&ast);
+    let out = CodeGen::new(&program).gen();
 
     if global_opts.has_emit(Emit::Asm) {
         println!("== Assembly ==\n\n{}\n", out);

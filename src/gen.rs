@@ -1,28 +1,38 @@
 use core::panic;
 use std::fmt::Write;
 
-use crate::ast::{Expr, Literal, Stmt};
+use crate::{
+    ast::{AssignmentStmt, Expr, Literal, Stmt},
+    parser::Program,
+};
 
 const REGISTER_LIST: [&str; 4] = ["%r8", "%r9", "%r10", "%r11"];
 
 type Reg = usize;
 
-pub struct CodeGen {
+pub struct CodeGen<'s> {
+    program: &'s Program<'s>,
     free_registers: [bool; 4],
     out: String,
 }
 
-impl CodeGen {
-    pub fn new() -> Self {
+impl<'s> CodeGen<'s> {
+    pub fn new(program: &'s Program) -> Self {
         Self {
-            ..Default::default()
+            program,
+            free_registers: Default::default(),
+            out: String::new(),
         }
     }
 
-    pub fn gen(&mut self, stmts: &[Stmt]) -> String {
+    pub fn gen(&mut self) -> String {
+        for symbol in self.program.symbol_table.iter() {
+            self.gen_glob_sym(symbol)
+        }
+
         self.preamble();
 
-        for stmt in stmts {
+        for stmt in &self.program.stmts {
             self.gen_stmt(stmt);
         }
 
@@ -33,11 +43,18 @@ impl CodeGen {
 
     fn gen_stmt(&mut self, stmt: &Stmt) {
         match stmt {
-            Stmt::LocalDecl(_) => todo!(),
+            Stmt::VarDecl(_) => {
+                // VarDecl only revolves around creating the global symbol, currently done in parser.
+            }
             Stmt::ExprStmt(_) => todo!(),
             Stmt::PrintStmt(print_stmt) => {
                 let value = self.gen_expr(&print_stmt.expr);
                 self.print_value(value);
+            }
+            Stmt::AssignmentStmt(AssignmentStmt { name, expr }) => {
+                let value = self.gen_expr(expr);
+                self.store_glob(value, name.literal(self.program.source));
+                self.free_reg(value);
             }
         }
     }
@@ -57,9 +74,9 @@ impl CodeGen {
             }
             Expr::Literal(lit) => {
                 let Literal::Int(value) = lit;
-                self.load(*value)
+                self.load_int(*value)
             }
-            Expr::Var(_) => todo!(),
+            Expr::Var(var) => self.load_glob(var.name.literal(self.program.source)),
             Expr::Call(_) => todo!(),
         }
     }
@@ -114,7 +131,30 @@ impl CodeGen {
         reg1
     }
 
-    fn load(&mut self, value: isize) -> Reg {
+    fn load_glob(&mut self, name: &str) -> Reg {
+        let reg = self.alloc_reg();
+
+        self.out
+            .push_str(&format!("\tmovq\t{}(%rip), {}\n", name, REGISTER_LIST[reg]));
+
+        reg
+    }
+
+    fn store_glob(&mut self, reg: Reg, name: &str) -> Reg {
+        self.out
+            .push_str(&format!("\tmovq\t{}, {}(%rip)\n", REGISTER_LIST[reg], name));
+
+        reg
+    }
+
+    /// Declares a global symbol, using the .comm directive.
+    ///
+    /// .comm name, size, alignment
+    fn gen_glob_sym(&mut self, symbol: &str) {
+        self.out.push_str(&format!("\t.comm\t{},8,8\n", symbol));
+    }
+
+    fn load_int(&mut self, value: isize) -> Reg {
         let reg = self.alloc_reg();
 
         self.out
@@ -183,14 +223,5 @@ impl CodeGen {
         }
 
         self.free_registers[reg] = true;
-    }
-}
-
-impl Default for CodeGen {
-    fn default() -> Self {
-        Self {
-            free_registers: [true; 4],
-            out: String::new(),
-        }
     }
 }
