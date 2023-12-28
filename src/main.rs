@@ -1,9 +1,12 @@
 use anyhow::Result;
 use clap::{Parser, Subcommand, ValueEnum};
 
+use crate::parser::Parser as CParser;
 use crate::{lexer::Lexer, token::TokenKind};
 
+pub mod ast;
 pub mod lexer;
+pub mod parser;
 pub mod token;
 
 fn main() -> Result<()> {
@@ -32,8 +35,20 @@ fn assemble(file: &str, global_opts: &GlobalOpts) -> Result<()> {
         std::process::exit(74);
     };
 
+    if global_opts.has_emit(Emit::Src) {
+        println!("==Source==\n\n{}\n", &content);
+    }
+
     if global_opts.has_emit(Emit::Tokens) {
         emit_tokens(&content);
+    }
+
+    let mut parser = CParser::new(&content);
+
+    let ast = parser.expr()?;
+
+    if global_opts.has_emit(Emit::Ast) {
+        println!("== Ast ==\n\n{:#?}\n", ast);
     }
 
     Ok(())
@@ -99,6 +114,7 @@ enum Command {
 
 #[derive(Debug, Clone, ValueEnum, PartialEq, PartialOrd)]
 enum Emit {
+    Src,
     Tokens,
     Ast,
     Asm,
