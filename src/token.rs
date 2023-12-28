@@ -45,8 +45,7 @@ pub enum TokenKind {
     Star,
     Slash,
 
-    Let,
-    Fn,
+    Print,
 
     Number,
     Ident,

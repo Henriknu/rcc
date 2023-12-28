@@ -65,8 +65,7 @@ impl<'s> Lexer<'s> {
 
     fn keyword(&mut self) -> Option<Token> {
         let token_type = match &self.source[self.start..self.current] {
-            "let" => TokenKind::Let,
-            "fn" => TokenKind::Fn,
+            "print" => TokenKind::Print,
             _ => return None,
         };
 
@@ -130,7 +129,7 @@ mod tests {
         assert_next_token_with_literal(&mut lexer, TokenKind::Number, "4", SOURCE);
     }
 
-    #[test]
+    /*     #[test]
     fn assignment() {
         const SOURCE: &str = "let a = 4 + 4;";
         let mut lexer = Lexer::new(SOURCE);
@@ -141,7 +140,7 @@ mod tests {
         assert_next_token_with_literal(&mut lexer, TokenKind::Number, "4", SOURCE);
         assert_next_token(&mut lexer, TokenKind::Plus);
         assert_next_token_with_literal(&mut lexer, TokenKind::Number, "4", SOURCE);
-    }
+    } */
 
     fn assert_next_token(lexer: &mut Lexer, kind: TokenKind) {
         let token = lexer.next_token();

@@ -16,10 +16,16 @@ pub struct FnDecl {
 pub enum Stmt {
     LocalDecl(LocalDecl),
     ExprStmt(ExprStmt),
+    PrintStmt(PrintStmt),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct ExprStmt {
+    pub expr: Expr,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct PrintStmt {
     pub expr: Expr,
 }
 

@@ -4,7 +4,8 @@ use thiserror::Error;
 
 use crate::{
     ast::{
-        BinaryExpr, BinaryOp, Call, Expr, ExprStmt, FnDecl, Item, Literal, LocalDecl, Stmt, Var,
+        BinaryExpr, BinaryOp, Call, Expr, ExprStmt, FnDecl, Item, Literal, LocalDecl, PrintStmt,
+        Stmt, Var,
     },
     lexer::Lexer,
     token::{Token, TokenKind},
@@ -12,7 +13,7 @@ use crate::{
 
 pub type ParserResult<T> = Result<T, ParsingError>;
 
-pub fn parse(source: &str) -> ParserResult<Expr> {
+pub fn parse(source: &str) -> ParserResult<Vec<Stmt>> {
     let mut parser = Parser::new(source);
     parser.parse()
 }
@@ -38,8 +39,14 @@ impl<'s> Parser<'s> {
         }
     }
 
-    pub fn parse(&mut self) -> ParserResult<Expr> {
-        self.expr()
+    pub fn parse(&mut self) -> ParserResult<Vec<Stmt>> {
+        let mut stmts = Vec::new();
+
+        while !self.is_at_end() {
+            stmts.push(self.stmt()?);
+        }
+
+        Ok(stmts)
     }
 
     /*  fn item(&mut self) -> ParserResult<Item> {
@@ -81,15 +88,17 @@ impl<'s> Parser<'s> {
         }))
     }
 
+    */
+
     fn stmt(&mut self) -> ParserResult<Stmt> {
-        if self.consume_if(TokenKind::Let) {
-            self.local_decl()
+        if self.consume_if(TokenKind::Print) {
+            self.print_stmt()
         } else {
             self.expr_stmt()
         }
     }
 
-    fn local_decl(&mut self) -> ParserResult<Stmt> {
+    /*  fn local_decl(&mut self) -> ParserResult<Stmt> {
         let name = self.expect(TokenKind::Ident)?;
 
         let initializer = if self.consume_if(TokenKind::Equals) {
@@ -104,6 +113,15 @@ impl<'s> Parser<'s> {
         let vardecl = LocalDecl { name, initializer };
 
         Ok(Stmt::LocalDecl(vardecl))
+    } */
+
+    fn print_stmt(&mut self) -> ParserResult<Stmt> {
+        let expr = self.expr()?;
+        self.expect(TokenKind::Semicolon)?;
+
+        let print_stmt = PrintStmt { expr };
+
+        Ok(Stmt::PrintStmt(print_stmt))
     }
 
     fn expr_stmt(&mut self) -> ParserResult<Stmt> {
@@ -113,7 +131,7 @@ impl<'s> Parser<'s> {
         let expr_stmt = ExprStmt { expr };
 
         Ok(Stmt::ExprStmt(expr_stmt))
-    } */
+    }
 
     pub fn expr(&mut self) -> ParserResult<Expr> {
         self.term()

@@ -35,6 +35,9 @@ main:
 	subq	%r8, %r10
 	movq	%r10, %rdi
 	call	printint
+	movq	$16, %r8
+	movq	%r8, %rdi
+	call	printint
 
 	movl	$0, %eax
 	popq	%rbp

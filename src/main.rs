@@ -63,7 +63,7 @@ fn assemble(file: &str, global_opts: &GlobalOpts) -> Result<String> {
 
     let mut parser = CParser::new(&content);
 
-    let ast = parser.expr()?;
+    let ast = parser.parse()?;
 
     if global_opts.has_emit(Emit::Ast) {
         println!("== Ast ==\n\n{:#?}\n", ast);

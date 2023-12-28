@@ -1,7 +1,7 @@
 use core::panic;
 use std::fmt::Write;
 
-use crate::ast::{Expr, Literal};
+use crate::ast::{Expr, Literal, Stmt};
 
 const REGISTER_LIST: [&str; 4] = ["%r8", "%r9", "%r10", "%r11"];
 
@@ -19,15 +19,27 @@ impl CodeGen {
         }
     }
 
-    pub fn gen(&mut self, expr: &Expr) -> String {
+    pub fn gen(&mut self, stmts: &[Stmt]) -> String {
         self.preamble();
 
-        let value = self.gen_expr(expr);
-        self.print_value(value);
+        for stmt in stmts {
+            self.gen_stmt(stmt);
+        }
 
         self.postabmle();
 
         self.out.clone()
+    }
+
+    fn gen_stmt(&mut self, stmt: &Stmt) {
+        match stmt {
+            Stmt::LocalDecl(_) => todo!(),
+            Stmt::ExprStmt(_) => todo!(),
+            Stmt::PrintStmt(print_stmt) => {
+                let value = self.gen_expr(&print_stmt.expr);
+                self.print_value(value);
+            }
+        }
     }
 
     fn gen_expr(&mut self, expr: &Expr) -> Reg {
