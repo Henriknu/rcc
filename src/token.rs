@@ -39,6 +39,7 @@ pub enum TokenKind {
     Comma,
     Semicolon,
 
+    // Operators
     Equals,
     EqualsEquals,
     NotEquals,
@@ -52,6 +53,9 @@ pub enum TokenKind {
     Slash,
     Bang,
 
+    // Keywords
+    If,
+    Else,
     Print,
 
     Number,

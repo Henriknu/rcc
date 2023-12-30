@@ -58,6 +58,8 @@ impl<'s> CodeGen<'s> {
                 self.store_glob(value, name.literal(self.program.source));
                 self.free_reg(value);
             }
+            Stmt::IfStmt(_) => todo!(),
+            Stmt::BlockStmt(_) => todo!(),
         }
     }
 

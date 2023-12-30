@@ -2,8 +2,8 @@ use thiserror::Error;
 
 use crate::{
     ast::{
-        AssignmentStmt, BinaryExpr, BinaryOp, Call, Expr, ExprStmt, Literal, PrintStmt, Stmt, Var,
-        VarDecl,
+        AssignmentStmt, BinaryExpr, BinaryOp, BlockStmt, Call, Expr, ExprStmt, IfStmt, Literal,
+        PrintStmt, Stmt, Var, VarDecl,
     },
     lexer::Lexer,
     sym::SymbolTable,
@@ -103,7 +103,11 @@ impl<'s> Parser<'s> {
     */
 
     fn stmt(&mut self) -> ParserResult<Stmt> {
-        if self.consume_if(TokenKind::Print) {
+        if self.consume_if(TokenKind::If) {
+            self.if_stmt()
+        } else if self.consume_if(TokenKind::LBrace) {
+            self.block_stmt()
+        } else if self.consume_if(TokenKind::Print) {
             self.print_stmt()
         } else if self.consume_if(TokenKind::Int) {
             self.vardecl_stmt()
@@ -112,6 +116,42 @@ impl<'s> Parser<'s> {
         } else {
             self.expr_stmt()
         }
+    }
+
+    fn if_stmt(&mut self) -> ParserResult<Stmt> {
+        self.expect(TokenKind::LParen)?;
+
+        let condition = self.expr()?;
+
+        self.expect(TokenKind::RParen)?;
+
+        let body = Box::new(self.stmt()?);
+
+        let else_ = {
+            if self.consume_if(TokenKind::Else) {
+                Some(Box::new(self.stmt()?))
+            } else {
+                None
+            }
+        };
+
+        Ok(Stmt::IfStmt(IfStmt {
+            condition,
+            body,
+            else_,
+        }))
+    }
+
+    fn block_stmt(&mut self) -> ParserResult<Stmt> {
+        let mut body = Vec::new();
+
+        while !self.current.is_kind(TokenKind::RBrace) && !self.is_at_end() {
+            body.push(self.stmt()?);
+        }
+
+        self.expect(TokenKind::RBrace)?;
+
+        Ok(Stmt::BlockStmt(BlockStmt { body }))
     }
 
     fn vardecl_stmt(&mut self) -> ParserResult<Stmt> {
@@ -402,6 +442,93 @@ mod tests {
         }));
 
         assert_eq!(Parser::new(SOURCE).expr().unwrap(), expr);
+    }
+
+    #[test]
+    fn if_braces() {
+        const SOURCE: &str = "int a; if(5==5) { a = 5; }";
+
+        let stmts = vec![Stmt::IfStmt(IfStmt {
+            condition: Expr::BinaryExpression(Box::new(BinaryExpr {
+                left: Expr::Literal(Literal::Int(5)),
+                right: Expr::Literal(Literal::Int(5)),
+                op: BinaryOp::Equals,
+            })),
+            body: Box::new(Stmt::BlockStmt(BlockStmt {
+                body: vec![Stmt::AssignmentStmt(AssignmentStmt {
+                    name: Token {
+                        kind: TokenKind::Ident,
+                        span: TokenSpan { start: 18, len: 1 },
+                    },
+                    expr: Expr::Literal(Literal::Int(5)),
+                })],
+            })),
+            else_: None,
+        })];
+
+        let parsed = Parser::new(SOURCE).parse().unwrap();
+
+        assert_eq!(parsed.stmts[1..], stmts);
+    }
+
+    #[test]
+    fn if_no_braces() {
+        const SOURCE: &str = "int a; if(5==5) a = 5;";
+
+        let stmts = vec![Stmt::IfStmt(IfStmt {
+            condition: Expr::BinaryExpression(Box::new(BinaryExpr {
+                left: Expr::Literal(Literal::Int(5)),
+                right: Expr::Literal(Literal::Int(5)),
+                op: BinaryOp::Equals,
+            })),
+            body: Box::new(Stmt::AssignmentStmt(AssignmentStmt {
+                name: Token {
+                    kind: TokenKind::Ident,
+                    span: TokenSpan { start: 16, len: 1 },
+                },
+                expr: Expr::Literal(Literal::Int(5)),
+            })),
+            else_: None,
+        })];
+
+        let parsed = Parser::new(SOURCE).parse().unwrap();
+
+        assert_eq!(parsed.stmts[1..], stmts);
+    }
+
+    #[test]
+    fn if_else() {
+        const SOURCE: &str = "int a; if(5==5) { a = 5; } else { a = 6; }";
+
+        let stmts = vec![Stmt::IfStmt(IfStmt {
+            condition: Expr::BinaryExpression(Box::new(BinaryExpr {
+                left: Expr::Literal(Literal::Int(5)),
+                right: Expr::Literal(Literal::Int(5)),
+                op: BinaryOp::Equals,
+            })),
+            body: Box::new(Stmt::BlockStmt(BlockStmt {
+                body: vec![Stmt::AssignmentStmt(AssignmentStmt {
+                    name: Token {
+                        kind: TokenKind::Ident,
+                        span: TokenSpan { start: 18, len: 1 },
+                    },
+                    expr: Expr::Literal(Literal::Int(5)),
+                })],
+            })),
+            else_: Some(Box::new(Stmt::BlockStmt(BlockStmt {
+                body: vec![Stmt::AssignmentStmt(AssignmentStmt {
+                    name: Token {
+                        kind: TokenKind::Ident,
+                        span: TokenSpan { start: 34, len: 1 },
+                    },
+                    expr: Expr::Literal(Literal::Int(6)),
+                })],
+            }))),
+        })];
+
+        let parsed = Parser::new(SOURCE).parse().unwrap();
+
+        assert_eq!(parsed.stmts[1..], stmts);
     }
 
     /*     #[test]

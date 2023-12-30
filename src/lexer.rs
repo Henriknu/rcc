@@ -95,6 +95,8 @@ impl<'s> Lexer<'s> {
 
     fn keyword(&mut self) -> Option<Token> {
         let token_type = match &self.source[self.start..self.current] {
+            "if" => TokenKind::If,
+            "else" => TokenKind::Else,
             "print" => TokenKind::Print,
             "int" => TokenKind::Int,
             _ => return None,
@@ -168,6 +170,26 @@ mod tests {
         assert_next_token_with_literal(&mut lexer, TokenKind::Number, "5", SOURCE);
         assert_next_token(&mut lexer, TokenKind::GreaterOrEquals);
         assert_next_token_with_literal(&mut lexer, TokenKind::Number, "4", SOURCE);
+    }
+
+    #[test]
+    fn if_else() {
+        const SOURCE: &str = "int a; if(5 == 5) a = 5; ";
+        let mut lexer = Lexer::new(SOURCE);
+
+        assert_next_token(&mut lexer, TokenKind::Int);
+        assert_next_token_with_literal(&mut lexer, TokenKind::Ident, "a", SOURCE);
+        assert_next_token(&mut lexer, TokenKind::Semicolon);
+        assert_next_token(&mut lexer, TokenKind::If);
+        assert_next_token(&mut lexer, TokenKind::LParen);
+        assert_next_token_with_literal(&mut lexer, TokenKind::Number, "5", SOURCE);
+        assert_next_token(&mut lexer, TokenKind::EqualsEquals);
+        assert_next_token_with_literal(&mut lexer, TokenKind::Number, "5", SOURCE);
+        assert_next_token(&mut lexer, TokenKind::RParen);
+        assert_next_token_with_literal(&mut lexer, TokenKind::Ident, "a", SOURCE);
+        assert_next_token(&mut lexer, TokenKind::Equals);
+        assert_next_token_with_literal(&mut lexer, TokenKind::Number, "5", SOURCE);
+        assert_next_token(&mut lexer, TokenKind::Semicolon);
     }
 
     fn assert_next_token(lexer: &mut Lexer, kind: TokenKind) {

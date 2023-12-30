@@ -14,10 +14,24 @@ pub struct FnDecl {
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Stmt {
+    IfStmt(IfStmt),
     VarDecl(VarDecl),
     AssignmentStmt(AssignmentStmt),
     ExprStmt(ExprStmt),
     PrintStmt(PrintStmt),
+    BlockStmt(BlockStmt),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct IfStmt {
+    pub condition: Expr,
+    pub body: Box<Stmt>,
+    pub else_: Option<Box<Stmt>>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct BlockStmt {
+    pub body: Vec<Stmt>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
