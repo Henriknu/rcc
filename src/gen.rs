@@ -2,7 +2,7 @@ use core::panic;
 use std::fmt::Write;
 
 use crate::{
-    ast::{AssignmentStmt, BinaryExpr, Expr, IfStmt, Literal, Stmt},
+    ast::{AssignmentStmt, Expr, IfStmt, Literal, Stmt},
     parser::Program,
 };
 
@@ -197,10 +197,14 @@ impl<'s> CodeGen<'s> {
         )
         .unwrap();
 
-        // andq $255, reg2
+        // movzbq reg2, breg2
         // NB: Zeroes out everything above the lower byte.
-        // TODO: movzx reg2, breg2 might be better
-        writeln!(&mut self.out, "\tandq\t$255,{}", REGISTER_LIST[reg2]).unwrap();
+        writeln!(
+            &mut self.out,
+            "\tmovzbq\t{},{}",
+            BYTE_REGISTER_LIST[reg2], REGISTER_LIST[reg2]
+        )
+        .unwrap();
 
         self.free_reg(reg1);
 
