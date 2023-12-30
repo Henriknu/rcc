@@ -51,8 +51,6 @@ impl<'s> Parser<'s> {
         let mut stmts = Vec::new();
 
         while !self.is_at_end() {
-            dbg!("parsing stmt");
-
             stmts.push(self.stmt()?);
         }
 
@@ -169,18 +167,58 @@ impl<'s> Parser<'s> {
     }
 
     pub fn expr(&mut self) -> ParserResult<Expr> {
-        self.term()
+        self.equals()
+    }
+
+    fn equals(&mut self) -> ParserResult<Expr> {
+        let mut expr = self.comparison()?;
+
+        while self.current.kind == TokenKind::EqualsEquals
+            || self.current.kind == TokenKind::NotEquals
+        {
+            let op = BinaryOp::from_token_kind(&self.current.kind);
+
+            self.consume();
+
+            let right = self.comparison()?;
+            expr = Expr::BinaryExpression(Box::new(BinaryExpr {
+                left: expr,
+                right,
+                op,
+            }))
+        }
+
+        Ok(expr)
+    }
+
+    fn comparison(&mut self) -> ParserResult<Expr> {
+        let mut expr = self.term()?;
+
+        while self.current.kind == TokenKind::GreaterOrEquals
+            || self.current.kind == TokenKind::Greater
+            || self.current.kind == TokenKind::LessOrEquals
+            || self.current.kind == TokenKind::Less
+        {
+            let op = BinaryOp::from_token_kind(&self.current.kind);
+
+            self.consume();
+
+            let right = self.term()?;
+            expr = Expr::BinaryExpression(Box::new(BinaryExpr {
+                left: expr,
+                right,
+                op,
+            }))
+        }
+
+        Ok(expr)
     }
 
     fn term(&mut self) -> ParserResult<Expr> {
         let mut expr = self.factor()?;
 
         while self.current.kind == TokenKind::Plus || self.current.kind == TokenKind::Minus {
-            let op = match self.current.kind {
-                TokenKind::Plus => BinaryOp::Add,
-                TokenKind::Minus => BinaryOp::Sub,
-                _ => unreachable!(),
-            };
+            let op = BinaryOp::from_token_kind(&self.current.kind);
 
             self.consume();
 
@@ -199,11 +237,7 @@ impl<'s> Parser<'s> {
         let mut expr = self.call()?;
 
         while self.current.kind == TokenKind::Star || self.current.kind == TokenKind::Slash {
-            let op = match self.current.kind {
-                TokenKind::Star => BinaryOp::Mul,
-                TokenKind::Slash => BinaryOp::Div,
-                _ => unreachable!(),
-            };
+            let op = BinaryOp::from_token_kind(&self.current.kind);
 
             self.consume();
 
@@ -344,6 +378,27 @@ mod tests {
             left: Expr::Literal(Literal::Int(4)),
             right: Expr::Literal(Literal::Int(4)),
             op: BinaryOp::Add,
+        }));
+
+        assert_eq!(Parser::new(SOURCE).expr().unwrap(), expr);
+    }
+
+    #[test]
+    fn op_prec() {
+        const SOURCE: &str = "4 + 4 >= 2 * 4";
+
+        let expr = Expr::BinaryExpression(Box::new(BinaryExpr {
+            left: Expr::BinaryExpression(Box::new(BinaryExpr {
+                left: Expr::Literal(Literal::Int(4)),
+                right: Expr::Literal(Literal::Int(4)),
+                op: BinaryOp::Add,
+            })),
+            right: Expr::BinaryExpression(Box::new(BinaryExpr {
+                left: Expr::Literal(Literal::Int(2)),
+                right: Expr::Literal(Literal::Int(4)),
+                op: BinaryOp::Mul,
+            })),
+            op: BinaryOp::GreaterOrEquals,
         }));
 
         assert_eq!(Parser::new(SOURCE).expr().unwrap(), expr);

@@ -1,5 +1,6 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 
+#[derive(Default)]
 pub struct SymbolTable {
     inner: HashSet<String>,
 }

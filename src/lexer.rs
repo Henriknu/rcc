@@ -35,8 +35,38 @@ impl<'s> Lexer<'s> {
             '}' => self.token(TokenKind::RBrace),
             ',' => self.token(TokenKind::Comma),
             ';' => self.token(TokenKind::Semicolon),
-
-            '=' => self.token(TokenKind::Equals),
+            '=' => {
+                if let Some('=') = self.peek() {
+                    self.consume();
+                    self.token(TokenKind::EqualsEquals)
+                } else {
+                    self.token(TokenKind::Equals)
+                }
+            }
+            '!' => {
+                if let Some('=') = self.peek() {
+                    self.consume();
+                    self.token(TokenKind::NotEquals)
+                } else {
+                    self.token(TokenKind::Bang)
+                }
+            }
+            '>' => {
+                if let Some('=') = self.peek() {
+                    self.consume();
+                    self.token(TokenKind::GreaterOrEquals)
+                } else {
+                    self.token(TokenKind::Greater)
+                }
+            }
+            '<' => {
+                if let Some('=') = self.peek() {
+                    self.consume();
+                    self.token(TokenKind::LessOrEquals)
+                } else {
+                    self.token(TokenKind::Less)
+                }
+            }
             '+' => self.token(TokenKind::Plus),
             '-' => self.token(TokenKind::Minus),
             '*' => self.token(TokenKind::Star),
@@ -130,18 +160,15 @@ mod tests {
         assert_next_token_with_literal(&mut lexer, TokenKind::Number, "4", SOURCE);
     }
 
-    /*     #[test]
-    fn assignment() {
-        const SOURCE: &str = "let a = 4 + 4;";
+    #[test]
+    fn cmp() {
+        const SOURCE: &str = "5 >= 4";
         let mut lexer = Lexer::new(SOURCE);
 
-        assert_next_token_with_literal(&mut lexer, TokenKind::Let, "let", SOURCE);
-        assert_next_token_with_literal(&mut lexer, TokenKind::Ident, "a", SOURCE);
-        assert_next_token(&mut lexer, TokenKind::Equals);
+        assert_next_token_with_literal(&mut lexer, TokenKind::Number, "5", SOURCE);
+        assert_next_token(&mut lexer, TokenKind::GreaterOrEquals);
         assert_next_token_with_literal(&mut lexer, TokenKind::Number, "4", SOURCE);
-        assert_next_token(&mut lexer, TokenKind::Plus);
-        assert_next_token_with_literal(&mut lexer, TokenKind::Number, "4", SOURCE);
-    } */
+    }
 
     fn assert_next_token(lexer: &mut Lexer, kind: TokenKind) {
         let token = lexer.next_token();

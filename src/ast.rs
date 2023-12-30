@@ -1,4 +1,4 @@
-use crate::token::Token;
+use crate::token::{Token, TokenKind};
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Item {
@@ -74,6 +74,30 @@ pub enum BinaryOp {
     Sub,
     Mul,
     Div,
+    Equals,
+    NotEquals,
+    GreaterOrEquals,
+    Greater,
+    LessOrEquals,
+    Less,
+}
+
+impl BinaryOp {
+    pub fn from_token_kind(token_kind: &TokenKind) -> Self {
+        match token_kind {
+            TokenKind::EqualsEquals => BinaryOp::Equals,
+            TokenKind::NotEquals => BinaryOp::NotEquals,
+            TokenKind::Greater => BinaryOp::Greater,
+            TokenKind::Less => BinaryOp::Less,
+            TokenKind::GreaterOrEquals => BinaryOp::GreaterOrEquals,
+            TokenKind::LessOrEquals => BinaryOp::LessOrEquals,
+            TokenKind::Plus => BinaryOp::Add,
+            TokenKind::Minus => BinaryOp::Sub,
+            TokenKind::Star => BinaryOp::Mul,
+            TokenKind::Slash => BinaryOp::Div,
+            _ => unreachable!(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]

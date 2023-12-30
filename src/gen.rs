@@ -7,6 +7,7 @@ use crate::{
 };
 
 const REGISTER_LIST: [&str; 4] = ["%r8", "%r9", "%r10", "%r11"];
+const BYTE_REGISTER_LIST: [&str; 4] = ["%r8b", "%r9b", "%r10b", "%r11b"];
 
 type Reg = usize;
 
@@ -50,6 +51,7 @@ impl<'s> CodeGen<'s> {
             Stmt::PrintStmt(print_stmt) => {
                 let value = self.gen_expr(&print_stmt.expr);
                 self.print_value(value);
+                self.free_reg(value);
             }
             Stmt::AssignmentStmt(AssignmentStmt { name, expr }) => {
                 let value = self.gen_expr(expr);
@@ -65,11 +67,18 @@ impl<'s> CodeGen<'s> {
                 let left = self.gen_expr(&binary.left);
                 let right = self.gen_expr(&binary.right);
 
+                // handlers free left register, right is dst.
                 match binary.op {
                     crate::ast::BinaryOp::Add => self.add(left, right),
                     crate::ast::BinaryOp::Sub => self.sub(left, right),
                     crate::ast::BinaryOp::Mul => self.mul(left, right),
                     crate::ast::BinaryOp::Div => self.div(left, right),
+                    crate::ast::BinaryOp::Equals => self.equals(left, right),
+                    crate::ast::BinaryOp::NotEquals => self.not_equals(left, right),
+                    crate::ast::BinaryOp::GreaterOrEquals => self.greater_or_equals(left, right),
+                    crate::ast::BinaryOp::Greater => self.greater(left, right),
+                    crate::ast::BinaryOp::LessOrEquals => self.less_or_equals(left, right),
+                    crate::ast::BinaryOp::Less => self.less(left, right),
                 }
             }
             Expr::Literal(lit) => {
@@ -79,6 +88,57 @@ impl<'s> CodeGen<'s> {
             Expr::Var(var) => self.load_glob(var.name.literal(self.program.source)),
             Expr::Call(_) => todo!(),
         }
+    }
+
+    fn equals(&mut self, reg1: Reg, reg2: Reg) -> Reg {
+        self._compare(reg1, reg2, "sete")
+    }
+
+    fn not_equals(&mut self, reg1: Reg, reg2: Reg) -> Reg {
+        self._compare(reg1, reg2, "setne")
+    }
+
+    fn greater(&mut self, reg1: Reg, reg2: Reg) -> Reg {
+        self._compare(reg1, reg2, "setg")
+    }
+
+    fn less(&mut self, reg1: Reg, reg2: Reg) -> Reg {
+        self._compare(reg1, reg2, "setl")
+    }
+
+    fn greater_or_equals(&mut self, reg1: Reg, reg2: Reg) -> Reg {
+        self._compare(reg1, reg2, "setge")
+    }
+
+    fn less_or_equals(&mut self, reg1: Reg, reg2: Reg) -> Reg {
+        self._compare(reg1, reg2, "setle")
+    }
+
+    fn _compare(&mut self, reg1: Reg, reg2: Reg, set_instr: &str) -> Reg {
+        // cmpq reg2, reg1
+        writeln!(
+            &mut self.out,
+            "\tcmpq\t{}, {}",
+            REGISTER_LIST[reg2], REGISTER_LIST[reg1]
+        )
+        .unwrap();
+
+        // <set_instr> breg2
+        writeln!(
+            &mut self.out,
+            "\t{}\t{}",
+            set_instr, BYTE_REGISTER_LIST[reg2]
+        )
+        .unwrap();
+
+        // andq $255, reg2
+        // NB: Zeroes out everything above the lower byte.
+        // TODO: movzx reg2, breg2 might be better
+        writeln!(&mut self.out, "\tandq\t$255,{}", REGISTER_LIST[reg2]).unwrap();
+
+        self.free_reg(reg1);
+
+        reg2
     }
 
     fn add(&mut self, reg1: Reg, reg2: Reg) -> Reg {

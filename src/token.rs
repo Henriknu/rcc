@@ -40,10 +40,17 @@ pub enum TokenKind {
     Semicolon,
 
     Equals,
+    EqualsEquals,
+    NotEquals,
+    Greater,
+    Less,
+    GreaterOrEquals,
+    LessOrEquals,
     Plus,
     Minus,
     Star,
     Slash,
+    Bang,
 
     Print,
 
