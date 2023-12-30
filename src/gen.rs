@@ -2,7 +2,7 @@ use core::panic;
 use std::fmt::Write;
 
 use crate::{
-    ast::{AssignmentStmt, Expr, Literal, Stmt},
+    ast::{AssignmentStmt, BinaryExpr, Expr, IfStmt, Literal, Stmt},
     parser::Program,
 };
 
@@ -10,11 +10,13 @@ const REGISTER_LIST: [&str; 4] = ["%r8", "%r9", "%r10", "%r11"];
 const BYTE_REGISTER_LIST: [&str; 4] = ["%r8b", "%r9b", "%r10b", "%r11b"];
 
 type Reg = usize;
+type Label = usize;
 
 pub struct CodeGen<'s> {
     program: &'s Program<'s>,
     free_registers: [bool; 4],
     out: String,
+    label: Label,
 }
 
 impl<'s> CodeGen<'s> {
@@ -23,6 +25,7 @@ impl<'s> CodeGen<'s> {
             program,
             free_registers: Default::default(),
             out: String::new(),
+            label: 0,
         }
     }
 
@@ -58,9 +61,70 @@ impl<'s> CodeGen<'s> {
                 self.store_glob(value, name.literal(self.program.source));
                 self.free_reg(value);
             }
-            Stmt::IfStmt(_) => todo!(),
-            Stmt::BlockStmt(_) => todo!(),
+            Stmt::IfStmt(if_stmt) => self.if_stmt(if_stmt),
+            Stmt::BlockStmt(block_stmt) => {
+                for sub_stmt in &block_stmt.body {
+                    self.gen_stmt(sub_stmt);
+                }
+            }
         }
+    }
+
+    fn if_stmt(&mut self, stmt: &IfStmt) {
+        let else_label = self.inc_label();
+        let after_label = self.inc_label();
+        let else_format = self.format_label(else_label);
+        let after_format = self.format_label(after_label);
+
+        // TODO: Support anything other than comparisons in if stmts.
+
+        let Expr::BinaryExpression(binary_expr) = &stmt.condition else {
+            todo!("Truthy values in if statements not supported :)");
+        };
+
+        if !binary_expr.op.is_comparison() {
+            todo!("Currently only allow comparisons in if statements :)");
+        }
+
+        let left = self.gen_expr(&binary_expr.left);
+        let right = self.gen_expr(&binary_expr.right);
+
+        // cmpq right, left
+        writeln!(
+            &mut self.out,
+            "\tcmpq\t{}, {}",
+            REGISTER_LIST[right], REGISTER_LIST[left]
+        )
+        .unwrap();
+
+        // Do correct jump instr, based on op. Is gonna be reverse comparison.
+        let jump_instr = match binary_expr.op {
+            crate::ast::BinaryOp::Equals => "jne",
+            crate::ast::BinaryOp::NotEquals => "je",
+            crate::ast::BinaryOp::GreaterOrEquals => "jl",
+            crate::ast::BinaryOp::Greater => "jle",
+            crate::ast::BinaryOp::LessOrEquals => "jg",
+            crate::ast::BinaryOp::Less => "jge",
+            _ => unreachable!(),
+        };
+
+        // Jump over if block if condition was false.
+        // <jump_instr> <else_label>
+        writeln!(&mut self.out, "\t{jump_instr}\t{}", else_format).unwrap();
+
+        self.gen_stmt(&stmt.body);
+
+        // After if, jump to after the else.
+        // jmp <after_label>
+        writeln!(&mut self.out, "\tjmp\t{}", after_format).unwrap();
+
+        self.write_label(else_label);
+
+        if let Some(else_) = &stmt.else_ {
+            self.gen_stmt(else_);
+        }
+
+        self.write_label(after_label);
     }
 
     fn gen_expr(&mut self, expr: &Expr) -> Reg {
@@ -260,6 +324,24 @@ impl<'s> CodeGen<'s> {
         self.out.push_str("\n\tmovl	$0, %eax\n");
         self.out.push_str("\tpopq	%rbp\n");
         self.out.push_str("\tret\n");
+    }
+
+    fn format_label(&self, label: Label) -> String {
+        format!("L{label}")
+    }
+
+    fn write_label(&mut self, label: Label) {
+        let label = self.format_label(label);
+
+        writeln!(&mut self.out, "{label}:").unwrap()
+    }
+
+    fn inc_label(&mut self) -> Label {
+        let label = self.label;
+
+        self.label += 1;
+
+        label
     }
 
     fn alloc_reg(&mut self) -> usize {

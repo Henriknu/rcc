@@ -1,4 +1,4 @@
-	.comm	x,8,8
+	.comm	a,8,8
 	.text
 .LC0:
 	.string	"%d\n"
@@ -22,86 +22,20 @@ main:
 	pushq	%rbp
 	movq	%rsp, %rbp
 
-	movq	$7, %r8
-	movq	$9, %r9
+	movq	$3, %r8
+	movq	%r8, a(%rip)
+	movq	a(%rip), %r8
+	movq	$2, %r9
 	cmpq	%r9, %r8
-	setl	%r9b
-	andq	$255,%r9
-	movq	%r9, x(%rip)
-	movq	x(%rip), %r8
-	movq	%r8, %rdi
+	jne	L0
+	movq	$1, %r10
+	movq	%r10, %rdi
 	call	printint
-	movq	$7, %r8
-	movq	$9, %r9
-	cmpq	%r9, %r8
-	setle	%r9b
-	andq	$255,%r9
-	movq	%r9, x(%rip)
-	movq	x(%rip), %r8
-	movq	%r8, %rdi
-	call	printint
-	movq	$7, %r8
-	movq	$9, %r9
-	cmpq	%r9, %r8
-	setne	%r9b
-	andq	$255,%r9
-	movq	%r9, x(%rip)
-	movq	x(%rip), %r8
-	movq	%r8, %rdi
-	call	printint
-	movq	$7, %r8
-	movq	$7, %r9
-	cmpq	%r9, %r8
-	sete	%r9b
-	andq	$255,%r9
-	movq	%r9, x(%rip)
-	movq	x(%rip), %r8
-	movq	%r8, %rdi
-	call	printint
-	movq	$7, %r8
-	movq	$7, %r9
-	cmpq	%r9, %r8
-	setge	%r9b
-	andq	$255,%r9
-	movq	%r9, x(%rip)
-	movq	x(%rip), %r8
-	movq	%r8, %rdi
-	call	printint
-	movq	$7, %r8
-	movq	$7, %r9
-	cmpq	%r9, %r8
-	setle	%r9b
-	andq	$255,%r9
-	movq	%r9, x(%rip)
-	movq	x(%rip), %r8
-	movq	%r8, %rdi
-	call	printint
-	movq	$9, %r8
-	movq	$7, %r9
-	cmpq	%r9, %r8
-	setg	%r9b
-	andq	$255,%r9
-	movq	%r9, x(%rip)
-	movq	x(%rip), %r8
-	movq	%r8, %rdi
-	call	printint
-	movq	$9, %r8
-	movq	$7, %r9
-	cmpq	%r9, %r8
-	setge	%r9b
-	andq	$255,%r9
-	movq	%r9, x(%rip)
-	movq	x(%rip), %r8
-	movq	%r8, %rdi
-	call	printint
-	movq	$9, %r8
-	movq	$7, %r9
-	cmpq	%r9, %r8
-	setne	%r9b
-	andq	$255,%r9
-	movq	%r9, x(%rip)
-	movq	x(%rip), %r8
-	movq	%r8, %rdi
+	jmp	L1
+L0:
+L1:
+	movq	$2, %r10
+	movq	%r10, %rdi
 	call	printint
 
 	movl	$0, %eax

@@ -112,6 +112,14 @@ impl BinaryOp {
             _ => unreachable!(),
         }
     }
+
+    pub fn is_comparison(&self) -> bool {
+        use BinaryOp::*;
+        matches!(
+            self,
+            Equals | NotEquals | Greater | GreaterOrEquals | Less | LessOrEquals
+        )
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
